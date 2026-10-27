@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#050506">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TAPE CAM">
+  <meta name="description" content="A live analog VHS camera, with random tracking, scanlines and tape glitches.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="icon" href="icon.svg" type="image/png">
+  <title>TAPE CAM • VHS camera</title>
+  <style>
+  :root { color-scheme: dark; --pale:#faf9f3; --dim:#9b9c9d; --glass:rgba(20,20,20,.62); --acid:#deef81; --panel:#070708; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{margin:0;width:100%;height:100%;background:#050506;color:var(--pale);font-family:system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,sans-serif;overflow:hidden}
+  button,input{font:inherit} button {color:inherit;cursor:pointer;border:0;touch-action:manipulation} button:focus-visible,input:focus-visible{outline:2px solid var(--acid);outline-offset:4px}
+  [hidden]{display:none!important}
+  #app{height:100%;height:100dvh;min-height:0;display:flex;flex-direction:column;overscroll-behavior:contain;position:relative;background:#050506}
+  .top {height:calc(55px + env(safe-area-inset-top));min-height:calc(55px + env(safe-area-inset-top));padding:calc(7px + env(safe-area-inset-top)) 17px 7px;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#050506;z-index:4}
+  .brand{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:16px;font-weight:900;letter-spacing:-.9px;white-space:nowrap}.brand em{font-style:normal;color:var(--acid)}
+  .topright{display:flex;align-items:center;gap:9px;min-width:0}.tiny{font-size:9px;letter-spacing:1.3px;font-weight:800;color:var(--dim)}
+  .chip{border:1px solid #414544;border-radius:100px;background:#171918;padding:9px 12px;line-height:1;letter-spacing:1px;font:800 10px ui-monospace,monospace;color:var(--acid);white-space:nowrap}
+  .preview{position:relative;flex:1;min-height:0;overflow:hidden;background:#0d1110;isolation:isolate}
+  #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.01;pointer-events:none}
+  #canvas{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover}
+  .frame-glass{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 26px #0008;z-index:1}
+  .live-indicator{position:absolute;right:14px;top:15px;background:#060808a0;color:#eaece7;border:1px solid #ffffff30;border-radius:4px;padding:7px 9px;display:flex;align-items:center;gap:6px;font:700 10px ui-monospace,monospace;letter-spacing:1px;pointer-events:none;z-index:2}
+  .red-dot{height:7px;width:7px;border-radius:50%;background:#ed645a;box-shadow:0 0 7px #fe4e44}
+  .on-glass-bottom{position:absolute;right:14px;bottom:44px;font:700 10px ui-monospace,monospace;letter-spacing:1.2px;text-shadow:1px 1px #0008;z-index:2;color:#e7ddbb;pointer-events:none}
+  .setup{position:absolute;inset:0;z-index:3;background:radial-gradient(ellipse at 54% 35%,#28302b 0,#121716 54%,#090b0a 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:24px 25px;gap:15px}
+  .setupIcon{width:86px;height:86px;border:1px solid #55624b;border-radius:50%;display:grid;place-items:center;box-shadow:0 0 0 16px #ddf2850d,0 0 0 32px #ddf28506;color:var(--acid)}
+  .setupIcon svg{width:36px;height:36px}
+  .setup h1{font:900 23px ui-monospace,monospace;margin:18px 0 0;letter-spacing:-1.2px}.setup p{font-size:13px;line-height:1.5;color:#c0c6c0;max-width:320px;margin:0}
+  .setup p.error{color:#ffc8b9}.setup button{background:var(--acid);color:#1b2018;border-radius:100px;min-height:48px;padding:12px 26px;font-weight:900;font-size:13px;letter-spacing:.6px;margin-top:6px}
+  .setup button:disabled{opacity:.55}.setup .help{font-size:11px;color:#9fa79f;max-width:340px;line-height:1.5}
+  .bottom{background:#050506;flex:none;z-index:4;padding:10px 16px calc(15px + env(safe-area-inset-bottom));}
+  .modeRow{display:flex;align-items:center;justify-content:center;gap:24px;height:36px}
+  .mode{background:transparent;font:800 12px ui-monospace,monospace;letter-spacing:1.6px;color:#858885;padding:10px 5px}.mode.selected{color:var(--acid)}
+  .shutterRow{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;margin-top:7px;min-height:92px}
+  .round{border-radius:50%;width:51px;height:51px;display:grid;place-items:center;background:#242525;justify-self:center}.round svg{height:23px;width:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.round:disabled{opacity:.4}
+  #shutter{border:4px solid var(--pale);background:transparent;border-radius:50%;width:76px;height:76px;display:grid;place-items:center;padding:5px;justify-self:center}
+  #shutter span{display:block;border-radius:50%;background:#f5f4ed;width:100%;height:100%;transition:all .16s}
+  #shutter.videoMode span{background:#f5514f;width:28px;height:28px}#shutter.recording span{border-radius:6px;width:27px;height:27px;background:#f5514f}
+  #shutter:disabled{opacity:.4}
+  .miniPreview{height:48px;width:48px;border-radius:8px;border:1px solid #555;object-fit:cover;display:grid;place-items:center;background:#1c1e1d;overflow:hidden;justify-self:center;padding:0}
+  .miniPreview img{height:100%;width:100%;object-fit:cover}.miniPreview svg{height:19px;width:19px;fill:none;stroke:#9a9a97;stroke-width:1.6}
+  .underRow{height:30px;display:flex;justify-content:space-between;align-items:flex-end;margin:0 2px;color:#878d88;font:700 10px ui-monospace,monospace;letter-spacing:1px}
+  .textButton{background:transparent;color:#b6c0ac;padding:6px 2px;font-size:10px;font-weight:800;letter-spacing:1px}
+  .pillstate{color:#bbb;min-width:63px;text-align:center;font-variant-numeric:tabular-nums}
+  .controlsDrawer{position:absolute;bottom:calc(175px + env(safe-area-inset-bottom));left:14px;right:14px;z-index:6;background:rgba(19,22,21,.97);border:1px solid #535b50;border-radius:16px;padding:16px 19px 15px;box-shadow:0 10px 30px #0008}
+  .drawerTitle{font-size:12px;font-weight:800;letter-spacing:1px;display:flex;justify-content:space-between;align-items:center}
+  .drawerTitle b{color:var(--acid)}.slider{width:100%;margin:18px 0;accent-color:var(--acid)}
+  .scale{display:flex;justify-content:space-between;font:700 10px ui-monospace,monospace;color:#9d9d9d}
+  .toast{position:absolute;left:50%;bottom:calc(183px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:12;background:#f1efd9;color:#1d221b;border-radius:15px;padding:11px 16px;font-size:12px;line-height:1.35;font-weight:750;box-shadow:0 5px 25px #0008;min-width:180px;max-width:calc(100% - 48px);text-align:center;pointer-events:none}
+  .gallery{position:absolute;inset:0;z-index:10;background:#030303ee;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 15px calc(20px + env(safe-area-inset-bottom));gap:14px}
+  .gallery img{max-width:100%;max-height:70vh;min-height:0;object-fit:contain;border:1px solid #303030}
+  .galleryActions{display:flex;justify-content:center;gap:12px}.galleryActions button{padding:13px 19px;border-radius:30px;background:#2a2c2a;font-weight:700;font-size:13px}.galleryActions .highlight{color:#161b13;background:var(--acid)}
+  @media (min-width:620px){#app{max-width:480px;margin:auto;border-left:1px solid #333;border-right:1px solid #333}.setup h1{font-size:26px}}
+  @media (max-height:660px){.bottom{padding-top:5px}.shutterRow{min-height:74px}#shutter{width:65px;height:65px}.round{width:46px;height:46px}.underRow{height:25px}.top{height:calc(49px + env(safe-area-inset-top));min-height:calc(49px + env(safe-area-inset-top))}}
+  </style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand">TAPE<em>//</em>CAM</div>
+    <div class="topright"><span class="tiny">ANALOG VHS</span><button class="chip" id="randomize" title="Randomize VHS tape" aria-label="Randomize VHS tape">↝ NEW TAPE</button></div>
+  </header>
+  <main class="preview" id="preview" aria-label="VHS camera view">
+    <video id="video" autoplay muted playsinline webkit-playsinline></video>
+    <canvas id="canvas" width="480" height="640"></canvas>
+    <div class="frame-glass"></div>
+    <div class="live-indicator" id="liveBadge" hidden><span class="red-dot"></span><span id="badgeText">LIVE</span></div>
+    <div class="on-glass-bottom" id="tapeName">TAPE 01 / WORN</div>
+    <div class="setup" id="setup">
+      <div class="setupIcon"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 7h3l2-2h6l2 2h3c1 0 2 1 2 2v10c0 1-1 2-2 2H4c-1 0-2-1-2-2V9c0-1 1-2 2-2Zm8 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg></div>
+      <h1>YOUR VHS CAMERA</h1>
+      <p id="setupMsg">Allow camera access to start filming in retro VHS.</p>
+      <button id="start">ALLOW CAMERA</button>
+      <div class="help" id="setupHelp">Your video stays on your device. The first launch requires camera permission.</div>
+    </div>
+  </main>
+  <section class="bottom">
+    <div class="modeRow" role="group" aria-label="Capture mode">
+      <button class="mode selected" id="photoMode" aria-pressed="true">PHOTO</button>
+      <button class="mode" id="videoMode" aria-pressed="false">VIDEO</button>
+    </div>
+    <div class="shutterRow">
+      <button id="lastShot" class="miniPreview" aria-label="View last photo" disabled><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="2"/><path d="m3 18 6-6 4 4 3-3 5 5"/></svg></button>
+      <button id="shutter" aria-label="Take photo" disabled><span></span></button>
+      <button id="flip" class="round" aria-label="Flip camera" disabled><svg viewBox="0 0 24 24"><path d="M3 10a9 9 0 0 1 15-5l2 2M21 14a9 9 0 0 1-15 5l-2-2"/><path d="M20 2v5h-5M4 22v-5h5"/></svg></button>
+    </div>
+    <div class="underRow">
+      <button class="textButton" id="damageToggle" aria-expanded="false">⚙ TAPE DAMAGE</button>
+      <span class="pillstate" id="elapsed">63% DAMAGE</span>
+      <button class="textButton" id="stop" disabled>■ OFF</button>
+    </div>
+  </section>
+  <div id="drawer" class="controlsDrawer" hidden>
+    <div class="drawerTitle"><span>TAPE DAMAGE</span><b id="damageValue">63%</b></div>
+    <input id="damageSlider" class="slider" type="range" min="0" max="100" value="63" aria-label="VHS distortion strength">
+    <div class="scale"><span>CLEAN</span><span>DESTROYED</span></div>
+  </div>
+  <div class="gallery" id="gallery" hidden>
+    <img id="fullShot" alt="Last VHS photo">
+    <div class="galleryActions"><button id="closeGallery">CLOSE</button><button id="saveShot" class="highlight">SAVE / SHARE</button></div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</div>
+<script>
+(()=>{
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const video=$('video'),canvas=$('canvas'),ctx=canvas.getContext('2d',{alpha:false});
+  const W=canvas.width,H=canvas.height;
+  const buffer=document.createElement('canvas');buffer.width=W;buffer.height=H;const bctx=buffer.getContext('2d',{alpha:false});
+  const noise=document.createElement('canvas');noise.width=120;noise.height=160;const nctx=noise.getContext('2d');const pixels=nctx.createImageData(120,160);
+  const scan=document.createElement('canvas');scan.width=2;scan.height=5;const sctx=scan.getContext('2d');
+  sctx.fillStyle='#0007';sctx.fillRect(0,0,2,1);sctx.fillStyle='#fff1';sctx.fillRect(0,3,2,1);
+  const scanPattern=ctx.createPattern(scan,'repeat');
+  const tapes=[['WORN',.75,1],['STATIC',1,1.5],['HOME MOVIE',.32,.52],['TRACKING',1.6,.9],['GHOST',.55,.75],['DAMAGED',1.8,1.1],['DREAM',.32,.7],['LO-FI',.7,.75]];
+  let stream=null,facing='environment',active=false,starting=false,startId=0,raf=0,lastNoise=0;
+  let mode='photo',damage=.63,tape=0,seed=Math.random()*1000,jumpUntil=0,jumpY=0,jumpH=0,jumpX=0;
+  let recorder=null,recordChunks=[],recordStream=null,recordTimer=null,recordAt=0,lastBlob=null,lastURL=null,toastTimer=null;
+  const secure=window.isSecureContext && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1');
+  function showMessage(s){const el=$('toast');el.textContent=s;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{el.hidden=true},3600)}
+  function showSetup(message,err=false){$('setup').hidden=false;$('setupMsg').textContent=message;$('setupMsg').classList.toggle('error',err);$('start').disabled=false;$('start').textContent='TRY CAMERA AGAIN'}
+  function setUI(){
+    $('setup').hidden=active;$('shutter').disabled=!active;$('flip').disabled=!active;$('stop').disabled=!active;
+    $('liveBadge').hidden=!active;$('badgeText').textContent=(recorder&&recorder.state==='recording')?'REC':'LIVE';
+    $('shutter').classList.toggle('videoMode',mode==='video');$('shutter').classList.toggle('recording',!!(recorder&&recorder.state==='recording'));
+    $('shutter').setAttribute('aria-label',mode==='photo'?'Take photo':((recorder&&recorder.state==='recording')?'Stop recording':'Start recording'));
+    $('photoMode').classList.toggle('selected',mode==='photo');$('videoMode').classList.toggle('selected',mode==='video');
+    $('photoMode').setAttribute('aria-pressed',String(mode==='photo'));$('videoMode').setAttribute('aria-pressed',String(mode==='video'));
+    if(!(recorder&&recorder.state==='recording'))$('elapsed').textContent=Math.round(damage*100)+'% DAMAGE';
+  }
+  function tapeShuffle(){let next=tape;while(next===tape)next=Math.floor(Math.random()*tapes.length);tape=next;seed=Math.random()*1000;$('tapeName').textContent='TAPE '+String(tape+1).padStart(2,'0')+' / '+tapes[tape][0];showMessage('New tape: '+tapes[tape][0])}
+  function stopTracks(){if(stream){stream.getTracks().forEach(track=>track.stop());stream=null}video.pause();video.srcObject=null}
+  async function startCamera(){
+    if(starting)return;
+    if(!secure){showSetup('iPhone blocks camera access in downloaded HTML files. This app must be opened from an HTTPS website (such as GitHub Pages).',true);$('setupHelp').textContent='After publishing, open its HTTPS link in Safari, then Add to Home Screen.';return}
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showSetup('This browser does not support live camera access.',true);return}
+    const id=++startId;starting=true;$('start').disabled=true;$('start').textContent='STARTING CAMERA…';
+    cancelAnimationFrame(raf);stopTracks();
+    try{
+      let media;
+      try{media=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:960}}})}
+      catch(e){if(e.name==='OverconstrainedError'||e.name==='NotFoundError')media=await navigator.mediaDevices.getUserMedia({video:true,audio:false});else throw e}
+      if(id!==startId){media.getTracks().forEach(t=>t.stop());return}
+      stream=media;video.srcObject=media;video.muted=true;video.playsInline=true;
+      // Keep video on-screen, at almost-zero opacity, so mobile Safari continues decoding frames.
+      try{await video.play()}catch(e){throw new Error('Tap Allow and try again if the camera does not start. '+e.message)}
+      active=true;starting=false;setUI();raf=requestAnimationFrame(draw);
+    }catch(e){
+      if(id!==startId)return;
+      active=false;stopTracks();starting=false;setUI();
+      let msg=e.message||'Camera failed to start.';
+      if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError')msg='Camera permission was denied. In iPhone Settings → Safari → Camera, allow access, then reopen this app.';
+      else if(e.name==='NotReadableError')msg='Your camera is busy. Close other camera apps, then try again.';
+      else if(e.name==='NotFoundError')msg='No working camera could be found.';
+      showSetup(msg,true);
+    }finally{if(id===startId){starting=false;$('start').disabled=false;$('start').textContent='ALLOW CAMERA'}}
+  }
+  function stopRecording(){
+    if(recorder&&recorder.state!=='inactive')recorder.stop();
+    clearInterval(recordTimer);recordTimer=null;setUI();
+  }
+  function stopCamera(){++startId;if(recorder&&recorder.state==='recording')stopRecording();active=false;starting=false;cancelAnimationFrame(raf);stopTracks();setUI();showSetup('Camera is off. Tap below to start again.');$('start').textContent='START CAMERA';ctx.fillStyle='#101312';ctx.fillRect(0,0,W,H)}
+  function frameCover(){
+    if(video.readyState<2||!video.videoWidth||!video.videoHeight)return false;
+    const sw=video.videoWidth,sh=video.videoHeight,scale=Math.max(W/sw,H/sh),cw=W/scale,ch=H/scale;
+    bctx.save();bctx.filter=`contrast(${1.08+damage*.19}) saturate(${.85-damage*.19}) sepia(${.1+damage*.1})`;
+    if(facing==='user'){bctx.translate(W,0);bctx.scale(-1,1)}
+    bctx.drawImage(video,(sw-cw)/2,(sh-ch)/2,cw,ch,0,0,W,H);bctx.restore();return true;
+  }
+  function addNoise(now){
+    if(now-lastNoise>85){const d=pixels.data;for(let i=0;i<d.length;i+=4){const n=Math.random()*255;d[i]=d[i+1]=d[i+2]=n;d[i+3]=Math.random()*190}nctx.putImageData(pixels,0,0);lastNoise=now}
+    ctx.save();ctx.globalAlpha=(.06+damage*.25)*tapes[tape][2];ctx.imageSmoothingEnabled=false;ctx.drawImage(noise,0,0,W,H);ctx.restore();
+  }
+  function stamp(){
+    const d=new Date(),date=d.toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'}).toUpperCase(),time=d.toLocaleTimeString('en-US',{hour12:false});
+    ctx.save();ctx.fillStyle='#fceac1';ctx.shadowColor='#ffe2a2';ctx.shadowBlur=4;ctx.font='bold 17px ui-monospace,monospace';ctx.textBaseline='top';
+    ctx.fillText((recorder&&recorder.state==='recording')?'● REC':'▶ PLAY',16,16);
+    ctx.textBaseline='bottom';ctx.fillText(date,16,H-38);ctx.fillText(time,16,H-14);ctx.textAlign='right';ctx.fillText('SP',W-14,H-14);ctx.restore();
+  }
+  function draw(now){
+    if(!active)return;
+    if(frameCover()){
+      const m=tapes[tape];ctx.fillStyle='#080b09';ctx.fillRect(0,0,W,H);const x=Math.random()<damage*.1*m[1]?(Math.random()-.5)*21*damage:0;ctx.drawImage(buffer,x,0);
+      if(damage>.01){
+        if(now>jumpUntil&&Math.random()<(damage*.12*m[1])){jumpUntil=now+80+Math.random()*200;jumpY=Math.random()*(H-90);jumpH=9+Math.random()*80*damage;jumpX=(Math.random()-.5)*120*damage}
+        if(now<jumpUntil){ctx.drawImage(buffer,0,jumpY,W,jumpH,jumpX,jumpY,W,jumpH);ctx.fillStyle='#cde8d733';ctx.fillRect(0,jumpY+jumpH,W,2)}
+        const bar=((now*.028+seed*3)%(H+80))-40,grad=ctx.createLinearGradient(0,bar,0,bar+26);
+        grad.addColorStop(0,'#fff0');grad.addColorStop(.4,`rgba(250,250,230,${damage*.10})`);grad.addColorStop(.6,`rgba(0,0,0,${damage*.22})`);grad.addColorStop(1,'#fff0');ctx.fillStyle=grad;ctx.fillRect(0,bar,W,26);
+        if(Math.random()<damage*.25){ctx.fillStyle=`rgba(235,84,104,${damage*.14})`;ctx.fillRect(0,Math.random()*H,W,1+Math.random()*3);ctx.fillStyle=`rgba(87,197,201,${damage*.14})`;ctx.fillRect(0,Math.random()*H,W,1+Math.random()*2)}
+        addNoise(now);
+      }
+      ctx.globalAlpha=.50+damage*.42;ctx.fillStyle=scanPattern;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;
+      ctx.fillStyle='rgba(193,125,68,.045)';ctx.fillRect(0,0,W,H);
+      const v=ctx.createRadialGradient(W/2,H/2,80,W/2,H/2,H*.75);v.addColorStop(0,'#0000');v.addColorStop(1,`rgba(0,0,0,${.32+damage*.22})`);ctx.fillStyle=v;ctx.fillRect(0,0,W,H);stamp();
+    }
+    raf=requestAnimationFrame(draw);
+  }
+  function canRecord(){return typeof MediaRecorder!=='undefined'&&typeof canvas.captureStream==='function'}
+  function startRecording(){
+    if(!canRecord()){showMessage('Filtered video recording is not supported here. Use iPhone Screen Recording instead.');return}
+    try{
+      const types=['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp8','video/webm'];
+      const type=types.find(t=>MediaRecorder.isTypeSupported(t));
+      recordStream=canvas.captureStream(25);recordChunks=[];
+      recorder=new MediaRecorder(recordStream,type?{mimeType:type,videoBitsPerSecond:3000000}:{videoBitsPerSecond:3000000});
+      recorder.ondataavailable=e=>{if(e.data&&e.data.size)recordChunks.push(e.data)};
+      recorder.onerror=()=>showMessage('Video recording failed. Try iPhone Screen Recording.');
+      recorder.onstop=()=>{const fileType=recorder.mimeType||type||'video/webm',ext=fileType.includes('mp4')?'mp4':'webm';recordStream.getTracks().forEach(t=>t.stop());recordStream=null;if(recordChunks.length)download(new Blob(recordChunks,{type:fileType}),'tapecam-'+Date.now()+'.'+ext);else showMessage('No video was recorded.');recordChunks=[];recorder=null;setUI()};
+      recorder.start(300);recordAt=Date.now();recordTimer=setInterval(()=>{const s=Math.floor((Date.now()-recordAt)/1000);$('elapsed').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')},500);setUI();
+    }catch(e){showMessage('Video recording is unavailable on this iPhone. Use Screen Recording.');console.warn(e)}
+  }
+  function download(blob,name){
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),45000);
+    showMessage('File ready to save');
+  }
+  function takePhoto(){
+    if(!active)return;
+    canvas.toBlob(blob=>{
+      if(!blob){showMessage('Could not capture photo.');return}
+      if(lastURL)URL.revokeObjectURL(lastURL);
+      lastBlob=blob;lastURL=URL.createObjectURL(blob);$('fullShot').src=lastURL;
+      $('lastShot').innerHTML='';const img=document.createElement('img');img.src=lastURL;img.alt='VHS snapshot';$('lastShot').appendChild(img);$('lastShot').disabled=false;
+      $('gallery').hidden=false;
+    },'image/png');
+  }
+  async function savePhoto(){
+    if(!lastBlob)return;
+    const name='tapecam-'+Date.now()+'.png';
+    try{const file=new File([lastBlob],name,{type:'image/png'});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'TAPE CAM'});return}}
+    catch(e){if(e.name==='AbortError')return}
+    download(lastBlob,name);
+  }
+  $('start').addEventListener('click',startCamera);
+  $('stop').addEventListener('click',stopCamera);
+  $('flip').addEventListener('click',()=>{if(!active)return;facing=facing==='user'?'environment':'user';startCamera()});
+  $('randomize').addEventListener('click',tapeShuffle);
+  $('photoMode').addEventListener('click',()=>{if(recorder&&recorder.state==='recording')stopRecording();mode='photo';setUI()});
+  $('videoMode').addEventListener('click',()=>{mode='video';setUI();if(!canRecord())showMessage('iPhone may need Screen Recording for VHS video.')});
+  $('shutter').addEventListener('click',()=>{if(!active)return;if(mode==='photo')takePhoto();else if(recorder&&recorder.state==='recording')stopRecording();else startRecording()});
+  $('damageToggle').addEventListener('click',()=>{const open=$('drawer').hidden;$('drawer').hidden=!open;$('damageToggle').setAttribute('aria-expanded',String(open))});
+  $('damageSlider').addEventListener('input',e=>{damage=Number(e.target.value)/100;$('damageValue').textContent=e.target.value+'%';setUI()});
+  $('lastShot').addEventListener('click',()=>{if(lastBlob)$('gallery').hidden=false});
+  $('closeGallery').addEventListener('click',()=>{$('gallery').hidden=true});
+  $('saveShot').addEventListener('click',savePhoto);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&active&&video.paused)video.play().catch(()=>showSetup('Tap to restart your camera.'))});
+  window.addEventListener('pagehide',()=>{if(recorder&&recorder.state==='recording')stopRecording();stopTracks()});
+  if(!secure){showSetup('This downloaded file cannot access your iPhone camera. It must run from an HTTPS website.',true);$('setupHelp').textContent='Publish the included files on GitHub Pages, then open that HTTPS address in Safari and Add to Home Screen.';$('start').hidden=true}
+  else {setUI(); // On iPhone, a camera permission prompt may need a tap the first time.
+    // Trying immediately gives repeat visitors a camera-like one-tap launch.
+    if(document.visibilityState==='visible')startCamera();
+  }
+  if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>

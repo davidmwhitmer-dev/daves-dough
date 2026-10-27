@@ -1,0 +1,19 @@
+{
+  "name": "TAPE CAM — VHS Camera",
+  "short_name": "TAPE CAM",
+  "description": "Live randomized analog VHS camera effects",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050506",
+  "theme_color": "#050506",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
